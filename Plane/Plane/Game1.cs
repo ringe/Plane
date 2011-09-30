@@ -42,11 +42,16 @@ namespace Plane
         VertexPositionColor[] zAxis = new VertexPositionColor[2];
 
         // Rotation
-        float rotY = 0.0f;
+        float propRot = 0.0f;
+        float speedAngle;
 
         // Movement
-        Vector3 speed = new Vector3(3, 1, 0);
+        float BOUNDARY = 5f;
+        Vector3 movement = new Vector3(0.5f, 0, -1.5f);
         Vector3 position = new Vector3(0, 0, 0);
+
+        // Matrixstack
+        private Stack<Matrix> plane = new Stack<Matrix>();
 
         public Game1()
         {
@@ -137,31 +142,31 @@ namespace Plane
             // Initialize a "plane"
             planeVertices = new VertexPositionColor[7]
             {
-                new VertexPositionColor(new Vector3(-1,  0.7f,  -2), Color.Yellow),
-                new VertexPositionColor(new Vector3(-1,  0.7f,  -0.5f), Color.Yellow),
-                new VertexPositionColor(new Vector3(3,  0,  0), Color.Yellow),
-                new VertexPositionColor(new Vector3(-0.2f,  0,  0), Color.Yellow),
-                new VertexPositionColor(new Vector3(-1,  0.7f,  0.5f), Color.Yellow),
-                new VertexPositionColor(new Vector3(3,  0,  0), Color.Yellow),
-                new VertexPositionColor(new Vector3(-1,  0.7f,  2), Color.Yellow)
+                new VertexPositionColor(new Vector3(-2,     0.7f,   -1),    Color.Yellow),
+                new VertexPositionColor(new Vector3(-0.5f,  0.7f,   -1), Color.Yellow),
+                new VertexPositionColor(new Vector3(0,      0.7f,    3),    Color.Red),
+                new VertexPositionColor(new Vector3(0,      0,       -0.2f),    Color.Yellow),
+                new VertexPositionColor(new Vector3(0.5f,     0.7f,    -1), Color.Yellow),
+                new VertexPositionColor(new Vector3(0,      0.7f,    3),    Color.Blue),
+                new VertexPositionColor(new Vector3(2,     0.7f,    -1),    Color.Yellow)
             };
             
             // Initialize a propeller
             propVertices = new VertexPositionColor[4]
             {
-                new VertexPositionColor(new Vector3(-0.2f, -0.1f, -0.6f), Color.Blue),
-                new VertexPositionColor(new Vector3(-0.2f, 0.1f, -0.6f), Color.Blue),
-                new VertexPositionColor(new Vector3(-0.2f,-0.1f, 0.6f), Color.Blue),
-                new VertexPositionColor(new Vector3(-0.2f, 0.1f, 0.6f), Color.Blue)
+                new VertexPositionColor(new Vector3(-0.6f, -0.1f, -0.2f), Color.Blue),
+                new VertexPositionColor(new Vector3(-0.6f,  0.1f, -0.2f), Color.Blue),
+                new VertexPositionColor(new Vector3( 0.6f, -0.1f, -0.2f), Color.Blue),
+                new VertexPositionColor(new Vector3( 0.6f,  0.1f, -0.2f), Color.Blue)
             };
 
             // Set axis lines
-            xAxis[0] = new VertexPositionColor(new Vector3(-100.0f, 0f, 0f), Color.Yellow);
-            xAxis[1] = new VertexPositionColor(new Vector3(100.0f, 0f, 0f), Color.Yellow);
-            yAxis[0] = new VertexPositionColor(new Vector3(0f, -100.0f, 0f), Color.Green);
-            yAxis[1] = new VertexPositionColor(new Vector3(0f, 100.0f, 0f), Color.Green);
-            zAxis[0] = new VertexPositionColor(new Vector3(0f, 0f, -100.0f), Color.Pink);
-            zAxis[1] = new VertexPositionColor(new Vector3(0f, 0f, 100.0f), Color.Pink);
+            xAxis[0] = new VertexPositionColor(new Vector3(-100.0f, 0f, 0f), Color.Red);
+            xAxis[1] = new VertexPositionColor(new Vector3(100.0f, 0f, 0f), Color.Red);
+            yAxis[0] = new VertexPositionColor(new Vector3(0f, -100.0f, 0f), Color.White);
+            yAxis[1] = new VertexPositionColor(new Vector3(0f, 100.0f, 0f), Color.White);
+            zAxis[0] = new VertexPositionColor(new Vector3(0f, 0f, -100.0f), Color.Black);
+            zAxis[1] = new VertexPositionColor(new Vector3(0f, 0f, 100.0f), Color.Black);
         }
 
         /// <summary>
@@ -196,9 +201,87 @@ namespace Plane
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed)
                 this.Exit();
 
-            // TODO: Add your update logic here
+            GetRotationAngle();
+            HandleKeyboardInput();
+            UpdatePosition();
 
             base.Update(gameTime);
+        }
+
+        /// <summary>
+        /// Update the current position by the current movement
+        /// </summary>
+        private void UpdatePosition()
+        {
+            if (position.X > BOUNDARY || position.X < -BOUNDARY)
+                movement.X *= -1;
+            if (position.Z > BOUNDARY || position.Z < -BOUNDARY)
+                movement.Z *= -1;
+
+            position += movement * (float)TargetElapsedTime.Milliseconds / 1000f;
+        }
+
+        /// <summary>
+        /// React to key press
+        /// </summary>
+        private void HandleKeyboardInput()
+        {
+            KeyboardState keys = Keyboard.GetState();
+
+            // Determine change in direction
+            if (keys.IsKeyDown(Keys.Left))
+                SetSpeed(false);
+            else if (keys.IsKeyDown(Keys.Right))
+                SetSpeed(true);
+
+            // Determine change in speed
+            if (keys.IsKeyDown(Keys.Up))
+                movement = movement + movement * 0.02f;
+            else if (keys.IsKeyDown(Keys.Down))
+                movement = movement - movement * 0.02f;
+
+            // Determine change in direction up/down
+            //if (keys.IsKeyDown(Keys.W))
+            //    SetAngle(false);
+            //else if (keys.IsKeyDown(Keys.S))
+            //    SetAngle(true);
+
+            // Exit
+            if (keys.IsKeyDown(Keys.Escape))
+                this.Exit();
+        }
+
+        /// <summary>
+        /// Set the speed vector
+        /// </summary>
+        private void SetSpeed(bool right)
+        {
+            float x, z, angle;
+            float r = movement.Length();
+
+            if (right)
+                angle = speedAngle - (float)Math.PI / 100.0f;
+            else
+                angle = speedAngle + (float)Math.PI / 100.0f;
+
+            x = 0.0f + r * (float)Math.Sin(angle);
+            z = 0.0f + r * (float)Math.Cos(angle);
+
+            movement.X = x;
+            movement.Z = z;
+        }
+
+        /// <summary>
+        /// Get the rotation angle (turning angle)
+        /// </summary>
+        private float GetRotationAngle()
+        {
+            float fRotY;
+
+            fRotY = (float)Math.Atan2(movement.X, movement.Z);
+            speedAngle = fRotY;
+
+            return fRotY - (float)Math.PI / 2;
         }
 
         private void DrawPlane()
@@ -207,32 +290,48 @@ namespace Plane
             
             Matrix.CreateScale(0.5f, 0.5f, 0.5f, out scale);
 
-            // Rotasjon om egen akse
-            rotatY = Matrix.CreateRotationY(rotY);
-            rotY += (float)TargetElapsedTime.Milliseconds / -1000f;
-            rotY = rotY % (float)(2 * Math.PI);
+            // Set rotation according to the movement angle
+            rotatY = Matrix.CreateRotationY(speedAngle);
 
-            //position += speed / 100;
+            // Set translation to current position
             move = Matrix.CreateTranslation(position);
 
-            world = Matrix.Identity * scale * rotatY * move;
+            plane.Push(scale * rotatY * move);
 
-            // Draw earth
+            world = Matrix.Identity * plane.Peek();
+
             effect.World = world;
 
-            this.DrawPa();
-        }
-
-
-        private void DrawPa()
-        {
-            //Starter tegning - må bruke effect-objektet:
+            //Starter tegning
             foreach (EffectPass pass in effect.CurrentTechnique.Passes)
             {
                 pass.Apply();
-                //graphics.GraphicsDevice.DrawUserPrimitives<VertexPositionColor>(PrimitiveType.TriangleList, planeVertices, 0, 12);        
-                //GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, cubeVertices, 0, 15, VertexPositionColor.VertexDeclaration);
                 GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, planeVertices, 0, 5, VertexPositionColor.VertexDeclaration);
+            }
+            
+        }
+
+        /// <summary>
+        /// Draw the propeller at the back of the plane
+        /// </summary>
+        /// <param name="speed">How fast to spin the propeller</param>
+        private void DrawPropeller()
+        {
+            Matrix rotZ;
+            
+            // Rotasjon
+            rotZ = Matrix.CreateRotationZ(propRot);
+            propRot += (float)TargetElapsedTime.Milliseconds / 100 * Math.Abs(movement.Length());
+            propRot = propRot % (float)(2 * Math.PI);
+
+            world = Matrix.Identity * rotZ * plane.Pop();
+
+            effect.World = world;
+
+            //Starter tegning
+            foreach (EffectPass pass in effect.CurrentTechnique.Passes)
+            {
+                pass.Apply();
                 GraphicsDevice.DrawUserPrimitives(PrimitiveType.TriangleStrip, propVertices, 0, 2, VertexPositionColor.VertexDeclaration);
             }
         }
@@ -259,7 +358,7 @@ namespace Plane
         {
             RasterizerState rasterizerState1 = new RasterizerState();
             rasterizerState1.CullMode = CullMode.None;
-            rasterizerState1.FillMode = FillMode.WireFrame;
+            rasterizerState1.FillMode = FillMode.Solid;
             GraphicsDevice.RasterizerState = rasterizerState1;
 
             GraphicsDevice.Clear(Color.DeepSkyBlue);
@@ -272,6 +371,7 @@ namespace Plane
 
             DrawAxis();                 // Draw the axis lines
             DrawPlane();                // Draw the plane
+            DrawPropeller();            // Draw the propeller
 
             base.Draw(gameTime);
         }
