@@ -8,6 +8,7 @@ using Microsoft.Xna.Framework.GamerServices;
 using Microsoft.Xna.Framework.Graphics;
 using Microsoft.Xna.Framework.Input;
 using Microsoft.Xna.Framework.Media;
+using System.Runtime.InteropServices;
 
 namespace Plane
 {
@@ -16,8 +17,22 @@ namespace Plane
     /// </summary>
     public class Game1 : Microsoft.Xna.Framework.Game
     {
+        [DllImport("user32.dll", CharSet = CharSet.Auto)]
+        public static extern uint MessageBox(IntPtr hWnd, String text, String caption, uint type);
+
         private GraphicsDeviceManager graphics;
-        private BasicEffect effect;
+        private ContentManager content;
+
+        // Shaderstuff
+        private Effect effect;
+        //private EffectParameter effectWVP; // kumulativ matrise: w*v*p
+        private EffectParameter effectRed;
+        private EffectParameter effectWorld;
+        private EffectParameter effectView;
+        private EffectParameter effectProjection;
+
+        private float mfRed = 0f;
+        private bool mbRedIncrease = true;
 
         //WVP-matrisene:
         private Matrix world;
@@ -25,7 +40,7 @@ namespace Plane
         private Matrix view;
 
         //Kameraposisjon:
-        private Vector3 cameraPosition = new Vector3(5f, 6f, 5.0f); 
+        private Vector3 cameraPosition = new Vector3(10f, 14f, 13f); 
         private Vector3 cameraTarget = Vector3.Zero;
         private Vector3 cameraUpVector = new Vector3(0.0f, 1.0f, 0.0f);
 
@@ -46,7 +61,7 @@ namespace Plane
         float speedAngle;
 
         // Movement
-        float BOUNDARY = 5f;
+        float BOUNDARY = 7f;
         Vector3 movement = new Vector3(0.5f, 0, -1.5f);
         Vector3 position = new Vector3(0, 0, 0);
 
@@ -56,7 +71,7 @@ namespace Plane
         public Game1()
         {
             graphics = new GraphicsDeviceManager(this);
-            Content.RootDirectory = "Content";
+            content = new ContentManager(this.Services);
         }
 
         /// <summary>
@@ -81,18 +96,52 @@ namespace Plane
         private void InitDevice()
         {
 
-            graphics.PreferredBackBufferWidth = 800;
-            graphics.PreferredBackBufferHeight = 600;
+            graphics.PreferredBackBufferWidth = 1200;
+            graphics.PreferredBackBufferHeight = 800;
             graphics.IsFullScreen = false;
             graphics.ApplyChanges();
 
             Window.Title = "Flight!";
 
-            effect = new BasicEffect(GraphicsDevice);
+            //effect = new BasicEffect(GraphicsDevice);
 
-            effect.VertexColorEnabled = true;
+            //effect.VertexColorEnabled = true;
+
+            //Initialize Effect
+            try
+            {
+                effect = content.Load<Effect>(@"Content/MinEffekt2"); //ikke ta med .fx
+                effectWorld = effect.Parameters["World"];
+                effectView = effect.Parameters["View"];
+                effectProjection = effect.Parameters["Projection"];
+
+                effectRed = effect.Parameters["fx_Red"];
+                //effectWVP = effect.Parameters["fx_WVP"];
+            }
+            catch (ContentLoadException cle)
+            {
+                MessageBox(new IntPtr(0), cle.Message, "Utilgivelig feil...", 0);
+                this.Exit();
+            }
         }
 
+
+        void SetBlueColor(GameTime gameTime)
+        {
+            if (mbRedIncrease)
+                mfRed += (float)gameTime.ElapsedGameTime.Milliseconds / 1000.0f;
+            else
+                mfRed -= (float)gameTime.ElapsedGameTime.Milliseconds / 1000.0f;
+            if (mfRed <= 0.0f)
+                mbRedIncrease = true;
+            else if (mfRed >= 1.0f)
+                mbRedIncrease = false;
+
+            //Setter ny verdi på fx_Blue i shaderen:
+            effectRed.SetValue(mfRed);
+        }
+
+        #region Init and content stuff
         /// <summary>
         /// Position the camera.
         /// </summary>
@@ -108,8 +157,9 @@ namespace Plane
             Matrix.CreatePerspectiveFieldOfView(MathHelper.PiOver4, aspectRatio, 0.01f, 1000.0f, out projection);
 
             //Gir matrisene til shader:
-            effect.Projection = projection;
-            effect.View = view;
+            //effect.Projection = projection;
+            //effect.View = view;
+
         }
 
         /// <summary>
@@ -189,6 +239,7 @@ namespace Plane
         {
             // TODO: Unload any non ContentManager content here
         }
+        #endregion
 
         /// <summary>
         /// Allows the game to run logic such as updating the world,
@@ -205,22 +256,12 @@ namespace Plane
             HandleKeyboardInput();
             UpdatePosition();
 
+            SetBlueColor(gameTime);
+
             base.Update(gameTime);
         }
 
-        /// <summary>
-        /// Update the current position by the current movement
-        /// </summary>
-        private void UpdatePosition()
-        {
-            if (position.X > BOUNDARY || position.X < -BOUNDARY)
-                movement.X *= -1;
-            if (position.Z > BOUNDARY || position.Z < -BOUNDARY)
-                movement.Z *= -1;
-
-            position += movement * (float)TargetElapsedTime.Milliseconds / 1000f;
-        }
-
+        #region input
         /// <summary>
         /// React to key press
         /// </summary>
@@ -241,16 +282,18 @@ namespace Plane
                 movement = movement - movement * 0.02f;
 
             // Determine change in direction up/down
-            //if (keys.IsKeyDown(Keys.W))
-            //    SetAngle(false);
-            //else if (keys.IsKeyDown(Keys.S))
-            //    SetAngle(true);
+            if (keys.IsKeyDown(Keys.W))
+                position.Y += 0.05f;
+            else if (keys.IsKeyDown(Keys.S))
+                position.Y -= 0.05f;
 
-            // Exit
-            if (keys.IsKeyDown(Keys.Escape))
-                this.Exit();
+                // Exit
+                if (keys.IsKeyDown(Keys.Escape))
+                    this.Exit();
         }
+        #endregion
 
+        #region Movement
         /// <summary>
         /// Set the speed vector
         /// </summary>
@@ -284,6 +327,23 @@ namespace Plane
             return fRotY - (float)Math.PI / 2;
         }
 
+        /// <summary>
+        /// Update the current position by the current movement
+        /// </summary>
+        private void UpdatePosition()
+        {
+            if (position.X > BOUNDARY || position.X < -BOUNDARY)
+                movement.X *= -1;
+            if (position.Z > BOUNDARY || position.Z < -BOUNDARY)
+                movement.Z *= -1;
+            if (position.Y > BOUNDARY || position.Y < -BOUNDARY)
+                position.Y = position.Y * -1;
+
+            position += movement * (float)TargetElapsedTime.Milliseconds / 1000f;
+        }
+        #endregion
+
+        #region Draw plane, prop & axis
         private void DrawPlane()
         {
             Matrix scale, rotatY, move;
@@ -300,7 +360,11 @@ namespace Plane
 
             world = Matrix.Identity * plane.Peek();
 
-            effect.World = world;
+            //effect.World = world;
+            //effectWVP.SetValue(world * view * projection);
+            effectWorld.SetValue(world);
+            effectView.SetValue(view);
+            effectProjection.SetValue(projection);
 
             //Starter tegning
             foreach (EffectPass pass in effect.CurrentTechnique.Passes)
@@ -326,7 +390,11 @@ namespace Plane
 
             world = Matrix.Identity * rotZ * plane.Pop();
 
-            effect.World = world;
+            //effect.World = world;
+            //effectWVP.SetValue(world * view * projection);
+            effectWorld.SetValue(world);
+            effectView.SetValue(view);
+            effectProjection.SetValue(projection);
 
             //Starter tegning
             foreach (EffectPass pass in effect.CurrentTechnique.Passes)
@@ -349,6 +417,7 @@ namespace Plane
                 GraphicsDevice.DrawUserPrimitives(PrimitiveType.LineList, zAxis, 0, 1);
             }
         }
+        #endregion
 
         /// <summary>
         /// This is called when the game should draw itself.
@@ -366,8 +435,16 @@ namespace Plane
             //Setter world=I:
             world = Matrix.Identity;
 
+            //Matrix worldInverseTransposeMatrix = Matrix.Transpose(Matrix.Invert(world));
+            //effect.Parameters["WorldInverseTranspose"].SetValue(worldInverseTransposeMatrix);
+
             // Setter world-matrisa på effect-objektet (verteks-shaderen):
-            effect.World = world;
+            //effect.World = world;
+            
+            //effectWVP.SetValue(world * view * projection);
+            effectWorld.SetValue(world);
+            effectView.SetValue(view);
+            effectProjection.SetValue(projection);
 
             DrawAxis();                 // Draw the axis lines
             DrawPlane();                // Draw the plane
