@@ -49,7 +49,6 @@ namespace Plane
         //private SpriteFont spriteFont;
 
         // Prepare vertices
-        VertexPositionColor[] cubeVertices;
         VertexPositionColor[] planeVertices;
         VertexPositionColor[] propVertices;
         VertexPositionColor[] xAxis = new VertexPositionColor[2];
@@ -110,7 +109,7 @@ namespace Plane
             //Initialize Effect
             try
             {
-                effect = content.Load<Effect>(@"Content/MinEffekt2"); //ikke ta med .fx
+                effect = content.Load<Effect>(@"Content/MinEffekt2");
                 effectWorld = effect.Parameters["World"];
                 effectView = effect.Parameters["View"];
                 effectProjection = effect.Parameters["Projection"];
@@ -166,29 +165,7 @@ namespace Plane
         /// Prepare the object vertices
         /// </summary>
         protected void InitVertices()
-        {
-            // Initialize a Cube
-            cubeVertices = new VertexPositionColor[17]
-            {
-                new VertexPositionColor(new Vector3(-1,  1,  1), Color.Red),
-                new VertexPositionColor(new Vector3( 1,  1,  1), Color.Blue),
-                new VertexPositionColor(new Vector3(-1, -1,  1), Color.Yellow),
-                new VertexPositionColor(new Vector3(1, -1,  1), Color.Orange),
-                new VertexPositionColor(new Vector3(-1, -1, -1), Color.Blue),
-                new VertexPositionColor(new Vector3(1, -1, -1), Color.Green),
-                new VertexPositionColor(new Vector3(-1,  1, -1), Color.Yellow),
-                new VertexPositionColor(new Vector3(1,  1, -1), Color.Red),
-                new VertexPositionColor(new Vector3(-1,  1,  1), Color.Yellow),
-                new VertexPositionColor(new Vector3(1,  1,  1), Color.Green),
-                new VertexPositionColor(new Vector3(1, -1,  1), Color.Yellow),
-                new VertexPositionColor(new Vector3(1,  1, -1), Color.Blue),
-                new VertexPositionColor(new Vector3(1, -1, -1), Color.Orange),
-                new VertexPositionColor(new Vector3(-1, -1, -1), Color.Red),
-                new VertexPositionColor(new Vector3(-1,  1, -1), Color.Pink),
-                new VertexPositionColor(new Vector3(-1, -1,  1), Color.Green),
-                new VertexPositionColor(new Vector3(-1,  1,  1), Color.Yellow)
-            };
-                
+        {       
             // Initialize a "plane"
             planeVertices = new VertexPositionColor[7]
             {
